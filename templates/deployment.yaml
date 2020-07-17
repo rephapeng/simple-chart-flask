@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "simple-chart-flask.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "simple-chart-flask.name" . }}
+    helm.sh/chart: {{ include "simple-chart-flask.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "simple-chart-flask.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "simple-chart-flask.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.spec.containerPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.httpGet.path }}
+              port: http
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readlinessProbe.httpGet.path }}
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+
+---
+
+kind: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2beta1
+metadata:
+  name: {{ include "simple-chart-flask.fullname" . }}
+spec:
+  maxReplicas: {{ .Values.autoMaxReplicas }}
+  minReplicas: {{ .Values.autoMinReplicas }}
+  scaleTargetRef:
+    apiVersion: app/v1
+    kind: Deployment
+    name: {{ include "simple-chart-flask.fullname" . }}
+  metrics: 
+  - type: Resource
+    resource:
+      name: {{ .Values.resourceName }}
+      targetAverageUtilization: {{ .Values.Treshold }}
